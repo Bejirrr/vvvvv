@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>JSON to Lua CFrame Converter</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #16213e;
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #00d4ff;
+    }
+    .upload-area {
+      border: 3px dashed #00d4ff;
+      border-radius: 12px;
+      padding: 40px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-bottom: 20px;
+    }
+    .upload-area:hover {
+      background: rgba(0, 212, 255, 0.1);
+      border-color: #00ffaa;
+    }
+    .upload-area.dragover {
+      background: rgba(0, 255, 170, 0.2);
+      border-color: #00ffaa;
+    }
+    #file-input { display: none; }
+    .btn {
+      background: #00d4ff;
+      color: #000;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      margin: 10px 5px;
+      transition: 0.3s;
+    }
+    .btn:hover { background: #00ffaa; }
+    .btn:disabled { background: #555; cursor: not-allowed; }
+    #progress { margin: 15px 0; font-size: 0.9em; color: #aaa; }
+    #preview {
+      background: #0f0f1a;
+      padding: 15px;
+      border-radius: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      white-space: pre;
+      display: none;
+      margin-top: 15px;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 30px;
+      font-size: 0.8em;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>JSON → Lua CFrame Converter</h1>
+    <p style="text-align:center; margin-bottom:20px;">
+      Konversi file <code>ReplayBubble_*.json</code> ke format Roblox Lua
+    </p>
+
+    <div id="upload-area" class="upload-area">
+      <p><strong>Klik atau seret file JSON ke sini</strong></p>
+      <p style="margin-top:10px; font-size:0.9em; color:#aaa;">
+        Format: <code>SUMMIT ATIN → pos → [x,y,z, rot_matrix]</code>
+      </p>
+      <input type="file" id="file-input" accept=".json" />
+    </div>
+
+    <div style="text-align:center;">
+      <button id="convert-btn" class="btn" disabled>Konversi</button>
+      <button id="download-btn" class="btn" disabled style="display:none;">Download output.lua</button>
+    </div>
+
+    <div id="progress"></div>
+    <pre id="preview"></pre>
+
+    <div class="footer">
+      Dibuat untuk Roblox Replay System • Client-side only
+    </div>
+  </div>
+
+  <script>
+    // Matrix to Euler (XYZ order) - Roblox CFrame.Angles
+    function matrixToEuler(m) {
+      const [r00, r01, r02, r10, r11, r12, r20, r21, r22] = m;
+      let rx, ry, rz;
+
+      if (Math.abs(r20) < 0.999999) {
+        ry = -Math.asin(r20);
+        const cosY = Math.cos(ry);
+        rx = Math.atan2(r21 / cosY, r22 / cosY);
+        rz = Math.atan2(r10 / cosY, r00 / cosY);
+      } else {
+        rz = 0;
+        if (r20 <= -0.999999) {
+          ry = Math.PI / 2;
+          rx = rz + Math.atan2(r01, r02);
+        } else {
+          ry = -Math.PI / 2;
+          rx = -rz + Math.atan2(-r01, -r02);
+        }
+      }
+      return [rx, ry, rz];
+    }
+
+    // Format number with high precision
+    function fmt(n) {
+      return Number(n).toFixed(15).replace(/\.?0+$/, '');
+    }
+
+    // Main conversion
+    function convertToLua(data) {
+      const entries = data["SUMMIT ATIN"] || [];
+      const lines = ["return {"];
+
+      entries.forEach((entry, i) => {
+        const pos = entry.pos;
+        if (!pos || pos.length < 12) return;
+
+        const [x, y, z] = pos.slice(0, 3);
+        const rot = pos.slice(3, 12);
+        const [rx, ry, rz] = matrixToEuler(rot);
+
+        lines.push(
+          `    CFrame.new(${fmt(x)}, ${fmt(y)}, ${fmt(z)}) * CFrame.Angles(${fmt(rx)}, ${fmt(ry)}, ${fmt(rz)}),`
+        );
+
+        // Update progress
+        if (i % 100 === 0 || i === entries.length - 1) {
+          document.getElementById("progress").textContent =
+            `Memproses: ${i + 1}/${entries.length} frame...`;
+        }
+      });
+
+      lines[lines.length - 1] = lines[lines.length - 1].replace(/,$/, "");
+      lines.push("}");
+      return lines.join("\n");
+    }
+
+    // DOM Elements
+    const uploadArea = document.getElementById("upload-area");
+    const fileInput = document.getElementById("file-input");
+    const convertBtn = document.getElementById("convert-btn");
+    const downloadBtn = document.getElementById("download-btn");
+    const progress = document.getElementById("progress");
+    const preview = document.getElementById("preview");
+
+    let luaContent = "";
+
+    // Drag & Drop
+    ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
+      uploadArea.addEventListener(eventName, e => e.preventDefault(), false);
+    });
+
+    ["dragenter", "dragover"].forEach(eventName => {
+      uploadArea.addEventListener(eventName, () => uploadArea.classList.add("dragover"), false);
+    });
+
+    ["dragleave", "drop"].forEach(eventName => {
+      uploadArea.addEventListener(eventName, () => uploadArea.classList.remove("dragover"), false);
+    });
+
+    uploadArea.addEventListener("click", () => fileInput.click());
+    uploadArea.addEventListener("drop", e => {
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.endsWith(".json")) {
+        handleFile(file);
+      }
+    });
+
+    fileInput.addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (file) handleFile(file);
+    });
+
+    function handleFile(file) {
+      uploadArea.innerHTML = `<p>Terpilih: <strong>${file.name}</strong></p>`;
+      convertBtn.disabled = false;
+      convertBtn.textContent = "Konversi";
+      downloadBtn.style.display = "none";
+      preview.style.display = "none";
+      progress.textContent = "";
+
+      convertBtn.onclick = () => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            const json = JSON.parse(e.target.result);
+            progress.textContent = "Mengonversi... mohon tunggu";
+            setTimeout(() => {
+              luaContent = convertToLua(json);
+              preview.textContent = luaContent;
+              preview.style.display = "block";
+              downloadBtn.style.display = "inline-block";
+              downloadBtn.disabled = false;
+              progress.textContent = `Selesai! ${json["SUMMIT ATIN"]?.length || 0} frame dikonversi.`;
+              convertBtn.textContent = "Selesai";
+              convertBtn.disabled = true;
+
+              downloadBtn.onclick = () => {
+                const blob = new Blob([luaContent], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "output.lua";
+                a.click();
+                URL.revokeObjectURL(url);
+              };
+            }, 50);
+          } catch (err) {
+            alert("Error: File JSON tidak valid!\n" + err.message);
+          }
+        };
+        reader.readAsText(file);
+      };
+    }
+  </script>
+</body>
+</html>
