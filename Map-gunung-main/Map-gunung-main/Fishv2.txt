@@ -1,0 +1,659 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Player = game.Players.LocalPlayer
+local Character = Player.Character or Player.CharacterAdded:Wait()
+local PlayerGui = Player:WaitForChild("PlayerGui")
+local CoreGui = game:GetService("CoreGui")
+local RunService = game:GetService("RunService")
+
+-- Ambil semua Remote
+local netFolder = ReplicatedStorage.Packages._Index["sleitnick_net@0.2.0"].net
+local RFChargeFishingRod = netFolder["RF/ChargeFishingRod"]
+local AURA1 = netFolder["RF/RequestFishingMinigameStarted"]
+local REFishingCompleted = netFolder["RE/FishingCompleted"]
+local REUnequipToolFromHotbar = netFolder["RE/UnequipToolFromHotbar"]
+local REEquipToolFromHotbar = netFolder["RE/EquipToolFromHotbar"]
+local RFSellAllItems = netFolder["RF/SellAllItems"]
+
+-- Lokasi Teleport
+local teleports = {
+	{name="🏝️ Fisherman Island", pos=Vector3.new(57.79, 17.03, 2837.21)},
+	{name="🌸 Kohana", pos=Vector3.new(-659.68, 17.25, 447.27)},
+	{name="🌋 Kohana Volkano", pos=Vector3.new(-631.64, 56.52, 204.75)},
+	{name="🐠 Coral Reefs", pos=Vector3.new(-3142.84, 3.37, 2130.26)},
+	{name="🌊 Esoteric Depths", pos=Vector3.new(3256.75, -1300.66, 1393.43)},
+	{name="🌴 Tropical Grove", pos=Vector3.new(-2064.34, 6.26, 3655.67)},
+	{name="💫 Crater Island", pos=Vector3.new(1010.25, 22.27, 5080.05)},
+	{name="💎 Treasure Room", pos=Vector3.new(-3598.42, -279.73, -1633.82)},
+	{name="🗿 Sisyphus Statue", pos=Vector3.new(-3698.62, -135.58, -1022.3)},
+	{name="🌿 Ancient Jungle", pos=Vector3.new(1274.1, 7.85, -196.86)},
+	{name="🐛 Underground jungle", pos=Vector3.new(2097.69, -91.2, -702.12)},
+}
+
+-- Hapus GUI lama jika ada
+if PlayerGui:FindFirstChild("AutoFishingGui") then
+	PlayerGui.AutoFishingGui:Destroy()
+end
+if CoreGui:FindFirstChild("JSY_FISH") then
+	CoreGui.JSY_FISH:Destroy()
+end
+
+-- Function untuk menambahkan border
+local function addBorder(frame)
+	local border = Instance.new("UIStroke", frame)
+	border.Color = Color3.fromRGB(50, 120, 200)
+	border.Thickness = 2
+	border.Transparency = 0.3
+	return border
+end
+
+-- Buat ScreenGui utama
+local screenGui = Instance.new("ScreenGui", PlayerGui)
+screenGui.Name = "AutoFishingGui"
+screenGui.ResetOnSpawn = false
+
+-- Frame utama dengan design aesthetic biru-hitam
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 250, 0, 220)
+mainFrame.Position = UDim2.new(1, -260, 0, 10) -- Posisi pojok kanan atas
+mainFrame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.Active = true
+mainFrame.Draggable = true
+
+-- Shadow effect
+local shadow = Instance.new("UIStroke", mainFrame)
+shadow.Color = Color3.fromRGB(0, 100, 200)
+shadow.Thickness = 2
+shadow.Transparency = 0.3
+
+-- Corner rounding
+local corner = Instance.new("UICorner", mainFrame)
+corner.CornerRadius = UDim.new(0, 8)
+
+-- Header dengan gradient
+local header = Instance.new("Frame", mainFrame)
+header.Size = UDim2.new(1, 0, 0, 35)
+header.BackgroundColor3 = Color3.fromRGB(10, 15, 25)
+header.BorderSizePixel = 0
+
+local headerCorner = Instance.new("UICorner", header)
+headerCorner.CornerRadius = UDim.new(0, 8)
+
+local headerGradient = Instance.new("UIGradient", header)
+headerGradient.Color = ColorSequence.new({
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 80, 160)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 15, 25))
+})
+
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -30, 1, 0)
+title.Position = UDim2.new(0, 10, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "JSY FISHING"
+title.TextColor3 = Color3.fromRGB(200, 220, 255)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 16
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Function untuk membuat tombol aesthetic
+local function createAestheticButton(parent, text, yPos, isPrimary)
+	local btnFrame = Instance.new("Frame", parent)
+	btnFrame.Size = UDim2.new(1, -20, 0, 32)
+	btnFrame.Position = UDim2.new(0, 10, 0, yPos)
+	btnFrame.BackgroundColor3 = isPrimary and Color3.fromRGB(20, 25, 40) or Color3.fromRGB(25, 30, 45)
+	btnFrame.BorderSizePixel = 0
+	
+	local btnCorner = Instance.new("UICorner", btnFrame)
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	
+	local btnStroke = Instance.new("UIStroke", btnFrame)
+	btnStroke.Color = Color3.fromRGB(50, 120, 200)
+	btnStroke.Thickness = 1
+	btnStroke.Transparency = 0.5
+	
+	local btn = Instance.new("TextButton", btnFrame)
+	btn.Size = UDim2.new(1, 0, 1, 0)
+	btn.BackgroundTransparency = 1
+	btn.TextColor3 = Color3.fromRGB(220, 230, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.Text = text
+	btn.BorderSizePixel = 0
+	
+	-- Hover effect
+	btn.MouseEnter:Connect(function()
+		game:GetService("TweenService"):Create(btnFrame, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 40, 60)}):Play()
+	end)
+	
+	btn.MouseLeave:Connect(function()
+		game:GetService("TweenService"):Create(btnFrame, TweenInfo.new(0.2), {BackgroundColor3 = isPrimary and Color3.fromRGB(20, 25, 40) or Color3.fromRGB(25, 30, 45)}):Play()
+	end)
+	
+	return btn, btnFrame
+end
+
+-- Tombol Auto Fishing
+local toggleBtn, toggleFrame = createAestheticButton(mainFrame, "🎣 Auto Fishing [OFF]", 40, true)
+-- Tombol Auto Sell
+local autoSellBtn, autoSellFrame = createAestheticButton(mainFrame, "💰 Auto Sell Fish [OFF]", 77, false)
+-- Tombol Lokasi
+local lokasiBtn, lokasiFrame = createAestheticButton(mainFrame, "📍 Teleport Locations", 114, false)
+
+-- Panel Delay
+local delayPanel = Instance.new("Frame", mainFrame)
+delayPanel.Size = UDim2.new(1, -20, 0, 30)
+delayPanel.Position = UDim2.new(0, 10, 0, 151)
+delayPanel.BackgroundColor3 = Color3.fromRGB(20, 25, 40)
+delayPanel.BorderSizePixel = 0
+
+local delayCorner = Instance.new("UICorner", delayPanel)
+delayCorner.CornerRadius = UDim.new(0, 6)
+
+local delayLabel = Instance.new("TextLabel", delayPanel)
+delayLabel.Size = UDim2.new(0.6, 0, 1, 0)
+delayLabel.BackgroundTransparency = 1
+delayLabel.TextColor3 = Color3.fromRGB(200, 220, 255)
+delayLabel.Font = Enum.Font.GothamBold
+delayLabel.TextSize = 13
+delayLabel.Text = "⏱️ Delay: 1.0s"
+delayLabel.TextXAlignment = Enum.TextXAlignment.Left
+delayLabel.Position = UDim2.new(0, 10, 0, 0)
+
+local delayValue = 1.0
+
+-- Function untuk tombol kecil
+local function createSmallButton(parent, text, xPos, color)
+	local btn = Instance.new("TextButton", parent)
+	btn.Size = UDim2.new(0, 30, 0, 22)
+	btn.Position = UDim2.new(xPos, 0, 0.5, -11)
+	btn.BackgroundColor3 = color
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.Text = text
+	btn.BorderSizePixel = 0
+	
+	local btnCorner = Instance.new("UICorner", btn)
+	btnCorner.CornerRadius = UDim.new(0, 4)
+	
+	return btn
+end
+
+-- Tombol - dan + untuk delay
+local minusBtn = createSmallButton(delayPanel, "-", 0.65, Color3.fromRGB(80, 40, 40))
+local plusBtn = createSmallButton(delayPanel, "+", 0.85, Color3.fromRGB(40, 80, 40))
+
+-- Tombol Minimize 
+local minimizeBtn = Instance.new("TextButton", header)
+minimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+minimizeBtn.Position = UDim2.new(1, -60, 0.5, -12)
+minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 120)
+minimizeBtn.Text = "_"
+minimizeBtn.TextColor3 = Color3.fromRGB(200, 220, 255)
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextSize = 16
+minimizeBtn.BorderSizePixel = 0
+
+local minimizeCorner = Instance.new("UICorner", minimizeBtn)
+minimizeCorner.CornerRadius = UDim.new(0, 4)
+
+-- Tombol Close dengan design lebih baik
+local closeBtn = Instance.new("TextButton", header)
+closeBtn.Size = UDim2.new(0, 25, 0, 25)
+closeBtn.Position = UDim2.new(1, -30, 0.5, -12)
+closeBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+closeBtn.Text = "×"
+closeBtn.TextColor3 = Color3.fromRGB(255, 200, 200)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 18
+closeBtn.BorderSizePixel = 0
+
+local closeCorner = Instance.new("UICorner", closeBtn)
+closeCorner.CornerRadius = UDim.new(0, 4)
+
+-- Hover effect untuk tombol header
+minimizeBtn.MouseEnter:Connect(function()
+	minimizeBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
+end)
+minimizeBtn.MouseLeave:Connect(function()
+	minimizeBtn.BackgroundColor3 = Color3.fromRGB(40, 80, 120)
+end)
+
+closeBtn.MouseEnter:Connect(function()
+	closeBtn.BackgroundColor3 = Color3.fromRGB(170, 50, 50)
+end)
+closeBtn.MouseLeave:Connect(function()
+	closeBtn.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+end)
+
+-- Floating GUI (Minimized State) - DI ATAS
+local floatGui = Instance.new("ScreenGui")
+floatGui.Name = "JSY_FISH"
+floatGui.ResetOnSpawn = false
+floatGui.Parent = CoreGui
+floatGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+-- Main container untuk floating dan menu
+local floatContainer = Instance.new("Frame", floatGui)
+floatContainer.Size = UDim2.new(0, 180, 0, 50)
+floatContainer.Position = UDim2.new(0, 10, 0, 10) -- Posisi atas kiri
+floatContainer.BackgroundTransparency = 1
+floatContainer.Active = true
+floatContainer.Draggable = true
+
+-- Floating button utama
+local floatBtn = Instance.new("ImageButton", floatContainer)
+floatBtn.Size = UDim2.new(0, 45, 0, 45)
+floatBtn.Position = UDim2.new(0, 0, 0, 0)
+floatBtn.BorderSizePixel = 0
+floatBtn.BackgroundColor3 = Color3.fromRGB(10, 15, 25) -- Background hitam doff
+floatBtn.Image = "rbxassetid://86295158918012" -- Ganti dengan asset ID yang sesuai
+floatBtn.ScaleType = Enum.ScaleType.Fit
+floatBtn.Active = true
+
+-- Tambahkan corner dan border untuk floating button
+local floatCorner = Instance.new("UICorner", floatBtn)
+floatCorner.CornerRadius = UDim.new(0, 12)
+addBorder(floatBtn)
+
+-- Status indicator untuk floating button
+local statusIndicator = Instance.new("Frame", floatBtn)
+statusIndicator.Size = UDim2.new(0, 8, 0, 8)
+statusIndicator.Position = UDim2.new(1, -10, 1, -10)
+statusIndicator.BackgroundColor3 = Color3.fromRGB(170, 0, 0) -- Merah = OFF
+statusIndicator.BorderSizePixel = 0
+
+local indicatorCorner = Instance.new("UICorner", statusIndicator)
+indicatorCorner.CornerRadius = UDim.new(1, 0)
+
+-- Menu samping kanan floating button
+local menuFrame = Instance.new("Frame", floatContainer)
+menuFrame.Size = UDim2.new(0, 125, 0, 45)
+menuFrame.Position = UDim2.new(0, 50, 0, 0)
+menuFrame.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+menuFrame.BorderSizePixel = 0
+menuFrame.BackgroundTransparency = 0.1
+
+local menuCorner = Instance.new("UICorner", menuFrame)
+menuCorner.CornerRadius = UDim.new(0, 8)
+addBorder(menuFrame)
+
+-- Tombol-tombol di menu
+local menuToggleBtn = Instance.new("TextButton", menuFrame)
+menuToggleBtn.Size = UDim2.new(0, 55, 1, 0)
+menuToggleBtn.Position = UDim2.new(0, 5, 0, 0)
+menuToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 40)
+menuToggleBtn.TextColor3 = Color3.fromRGB(220, 230, 255)
+menuToggleBtn.Font = Enum.Font.GothamBold
+menuToggleBtn.TextSize = 12
+menuToggleBtn.Text = "FISH OFF"
+menuToggleBtn.BorderSizePixel = 0
+
+local menuToggleCorner = Instance.new("UICorner", menuToggleBtn)
+menuToggleCorner.CornerRadius = UDim.new(0, 6)
+
+local menuSellBtn = Instance.new("TextButton", menuFrame)
+menuSellBtn.Size = UDim2.new(0, 55, 1, 0)
+menuSellBtn.Position = UDim2.new(0, 65, 0, 0)
+menuSellBtn.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
+menuSellBtn.TextColor3 = Color3.fromRGB(220, 230, 255)
+menuSellBtn.Font = Enum.Font.GothamBold
+menuSellBtn.TextSize = 12
+menuSellBtn.Text = "SELL OFF"
+menuSellBtn.BorderSizePixel = 0
+
+local menuSellCorner = Instance.new("UICorner", menuSellBtn)
+menuSellCorner.CornerRadius = UDim.new(0, 6)
+
+-- Awalnya sembunyikan floating GUI
+floatGui.Enabled = false
+
+-- Variabel kontrol
+local running = false
+local destroyed = false
+local autoSell = false
+local isMinimized = false
+local freezeConnection = nil
+local freezePos = nil
+
+-- 🧹 Hapus animasi
+local function clearAnimations()
+	task.wait(0.1)
+	local char = Player.Character or Player.CharacterAdded:Wait()
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+	if humanoid then
+		local animator = humanoid:FindFirstChildOfClass("Animator")
+		if animator then
+			for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+				track:Stop()
+			end
+		end
+	end
+	if char:FindFirstChild("Animate") then
+		char.Animate:Destroy()
+	end
+end
+
+-- 🔒 Function untuk freeze karakter
+local function freezeCharacter(enable)
+	if freezeConnection then 
+		freezeConnection:Disconnect() 
+		freezeConnection = nil 
+	end
+	
+	if enable then
+		local char = Player.Character
+		if char and char:FindFirstChild("HumanoidRootPart") then
+			freezePos = char.HumanoidRootPart.CFrame
+			
+			freezeConnection = RunService.Heartbeat:Connect(function()
+				local char = Player.Character
+				if char and char.Parent then
+					local hrp = char:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						hrp.AssemblyLinearVelocity = Vector3.zero
+						hrp.AssemblyAngularVelocity = Vector3.zero
+						if (hrp.Position - freezePos.Position).Magnitude > 0.1 then
+							hrp.CFrame = freezePos
+						end
+					end
+				else
+					if freezeConnection then 
+						freezeConnection:Disconnect() 
+						freezeConnection = nil 
+					end
+				end
+			end)
+			print("🔒 Character frozen")
+		end
+	else
+		if freezeConnection then 
+			freezeConnection:Disconnect() 
+			freezeConnection = nil 
+		end
+		print("🔓 Character unfrozen")
+	end
+end
+
+-- 🧨 Hapus RE/FishCaught
+local function deleteFishCaughtRF()
+	local fishCaught = netFolder:FindFirstChild("RE/FishCaught")
+	if fishCaught then
+		fishCaught:Destroy()
+		warn("🗑️ RE/FishCaught deleted successfully.")
+	end
+end
+
+-- 💰 Auto Sell
+local function autoSellFish()
+	if autoSell then
+		RFSellAllItems:InvokeServer()
+		print("💰 Auto-sold all fish!")
+	end
+end
+
+-- 🎣 Auto Fishing
+local function doFishing()
+	while running and not destroyed do
+		local RemoteArgs = { [4] = workspace:GetServerTimeNow() }
+		RFChargeFishingRod:InvokeServer(unpack(RemoteArgs, 1, table.maxn(RemoteArgs)))
+		task.wait(0.5)
+		AURA1:InvokeServer(-31.9, 0.6, 1762147568.24)
+		task.wait(delayValue)
+		REFishingCompleted:FireServer()
+		task.wait(0.3)
+		autoSellFish()
+		REUnequipToolFromHotbar:FireServer()
+		task.wait(0.2)
+		REEquipToolFromHotbar:FireServer(1)
+		task.wait(1)
+	end
+end
+
+-- Function untuk update menu floating
+local function updateFloatingMenu()
+	if running then
+		menuToggleBtn.Text = "FISH ON"
+		menuToggleBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 40)
+		statusIndicator.BackgroundColor3 = Color3.fromRGB(0, 170, 0)
+	else
+		menuToggleBtn.Text = "FISH OFF"
+		menuToggleBtn.BackgroundColor3 = Color3.fromRGB(20, 25, 40)
+		statusIndicator.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
+	end
+	
+	if autoSell then
+		menuSellBtn.Text = "SELL ON"
+		menuSellBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 40)
+	else
+		menuSellBtn.Text = "SELL OFF"
+		menuSellBtn.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
+	end
+end
+
+-- Function untuk minimize GUI
+local function minimizeGUI()
+	isMinimized = true
+	screenGui.Enabled = false
+	floatGui.Enabled = true
+	updateFloatingMenu()
+end
+
+-- Function untuk restore GUI
+local function restoreGUI()
+	isMinimized = false
+	screenGui.Enabled = true
+	floatGui.Enabled = false
+end
+
+-- 🔘 Tombol Auto Fishing
+toggleBtn.MouseButton1Click:Connect(function()
+	if destroyed then return end
+	running = not running
+	if running then
+		clearAnimations()
+		deleteFishCaughtRF()
+		freezeCharacter(true) -- 🔒 FREEZE KARAKTER
+		toggleBtn.Text = "🎣 Auto Fishing [ON]"
+		toggleFrame.BackgroundColor3 = Color3.fromRGB(30, 80, 40)
+		task.spawn(doFishing)
+	else
+		freezeCharacter(false) -- 🔓 UNFREEZE KARAKTER
+		toggleBtn.Text = "🎣 Auto Fishing [OFF]"
+		toggleFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 40)
+	end
+	updateFloatingMenu()
+end)
+
+-- 💰 Tombol Auto Sell
+autoSellBtn.MouseButton1Click:Connect(function()
+	autoSell = not autoSell
+	if autoSell then
+		autoSellBtn.Text = "💰 Auto Sell Fish [ON]"
+		autoSellFrame.BackgroundColor3 = Color3.fromRGB(30, 80, 40)
+	else
+		autoSellBtn.Text = "💰 Auto Sell Fish [OFF]"
+		autoSellFrame.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
+	end
+	updateFloatingMenu()
+end)
+
+-- ➖ ➕ Tombol delay
+minusBtn.MouseButton1Click:Connect(function()
+	delayValue = math.max(1.0, delayValue - 0.1)
+	delayLabel.Text = "⏱️ Delay: " .. string.format("%.1f", delayValue) .. "s"
+end)
+plusBtn.MouseButton1Click:Connect(function()
+	delayValue = math.min(2.5, delayValue + 0.1)
+	delayLabel.Text = "⏱️ Delay: " .. string.format("%.1f", delayValue) .. "s"
+end)
+
+-- 🔽 Tombol Minimize
+minimizeBtn.MouseButton1Click:Connect(function()
+	minimizeGUI()
+end)
+
+-- ❌ Tombol Close
+closeBtn.MouseButton1Click:Connect(function()
+	destroyed = true
+	running = false
+	freezeCharacter(false) -- ?? UNFREEZE KARAKTER SAAT CLOSE
+	screenGui:Destroy()
+	floatGui:Destroy()
+end)
+
+-- 🔄 Floating button click untuk restore
+floatBtn.MouseButton1Click:Connect(function()
+	restoreGUI()
+end)
+
+-- 🎣 Tombol Fish di menu floating
+menuToggleBtn.MouseButton1Click:Connect(function()
+	if destroyed then return end
+	running = not running
+	if running then
+		clearAnimations()
+		deleteFishCaughtRF()
+		freezeCharacter(true) -- 🔒 FREEZE KARAKTER
+		toggleBtn.Text = "🎣 Auto Fishing [ON]"
+		toggleFrame.BackgroundColor3 = Color3.fromRGB(30, 80, 40)
+		task.spawn(doFishing)
+	else
+		freezeCharacter(false) -- 🔓 UNFREEZE KARAKTER
+		toggleBtn.Text = "🎣 Auto Fishing [OFF]"
+		toggleFrame.BackgroundColor3 = Color3.fromRGB(20, 25, 40)
+	end
+	updateFloatingMenu()
+end)
+
+-- 💰 Tombol Sell di menu floating
+menuSellBtn.MouseButton1Click:Connect(function()
+	autoSell = not autoSell
+	if autoSell then
+		autoSellBtn.Text = "💰 Auto Sell Fish [ON]"
+		autoSellFrame.BackgroundColor3 = Color3.fromRGB(30, 80, 40)
+	else
+		autoSellBtn.Text = "💰 Auto Sell Fish [OFF]"
+		autoSellFrame.BackgroundColor3 = Color3.fromRGB(25, 30, 45)
+	end
+	updateFloatingMenu()
+end)
+
+-- Hover effects untuk tombol menu
+menuToggleBtn.MouseEnter:Connect(function()
+	game:GetService("TweenService"):Create(menuToggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 40, 60)}):Play()
+end)
+menuToggleBtn.MouseLeave:Connect(function()
+	game:GetService("TweenService"):Create(menuToggleBtn, TweenInfo.new(0.2), {BackgroundColor3 = running and Color3.fromRGB(30, 80, 40) or Color3.fromRGB(20, 25, 40)}):Play()
+end)
+
+menuSellBtn.MouseEnter:Connect(function()
+	game:GetService("TweenService"):Create(menuSellBtn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(30, 40, 60)}):Play()
+end)
+menuSellBtn.MouseLeave:Connect(function()
+	game:GetService("TweenService"):Create(menuSellBtn, TweenInfo.new(0.2), {BackgroundColor3 = autoSell and Color3.fromRGB(30, 80, 40) or Color3.fromRGB(25, 30, 45)}):Play()
+end)
+
+-- 📍 GUI Lokasi dengan design yang sama
+lokasiBtn.MouseButton1Click:Connect(function()
+	local lokasiGui = Instance.new("Frame", screenGui)
+	lokasiGui.Size = UDim2.new(0, 280, 0, 300)
+	lokasiGui.Position = UDim2.new(0.5, -140, 0.5, -150)
+	lokasiGui.BackgroundColor3 = Color3.fromRGB(15, 20, 30)
+	lokasiGui.BorderSizePixel = 0
+	lokasiGui.Active = true
+	lokasiGui.Draggable = true
+	
+	local lokasiShadow = Instance.new("UIStroke", lokasiGui)
+	lokasiShadow.Color = Color3.fromRGB(0, 100, 200)
+	lokasiShadow.Thickness = 2
+	lokasiShadow.Transparency = 0.3
+	
+	local lokasiCorner = Instance.new("UICorner", lokasiGui)
+	lokasiCorner.CornerRadius = UDim.new(0, 8)
+	
+	local lokasiHeader = Instance.new("Frame", lokasiGui)
+	lokasiHeader.Size = UDim2.new(1, 0, 0, 35)
+	lokasiHeader.BackgroundColor3 = Color3.fromRGB(10, 15, 25)
+	lokasiHeader.BorderSizePixel = 0
+	
+	local headerCorner = Instance.new("UICorner", lokasiHeader)
+	headerCorner.CornerRadius = UDim.new(0, 8)
+	
+	local headerGradient = Instance.new("UIGradient", lokasiHeader)
+	headerGradient.Color = ColorSequence.new({
+		ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 80, 160)),
+		ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 15, 25))
+	})
+	
+	local lokasiTitle = Instance.new("TextLabel", lokasiHeader)
+	lokasiTitle.Size = UDim2.new(1, -30, 1, 0)
+	lokasiTitle.Position = UDim2.new(0, 10, 0, 0)
+	lokasiTitle.BackgroundTransparency = 1
+	lokasiTitle.Text = "📍 TELEPORT LOCATIONS"
+	lokasiTitle.TextColor3 = Color3.fromRGB(200, 220, 255)
+	lokasiTitle.Font = Enum.Font.GothamBold
+	lokasiTitle.TextSize = 16
+	lokasiTitle.TextXAlignment = Enum.TextXAlignment.Left
+	
+	local closeLokasi = Instance.new("TextButton", lokasiHeader)
+	closeLokasi.Size = UDim2.new(0, 25, 0, 25)
+	closeLokasi.Position = UDim2.new(1, -30, 0.5, -12)
+	closeLokasi.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+	closeLokasi.Text = "×"
+	closeLokasi.TextColor3 = Color3.fromRGB(255, 200, 200)
+	closeLokasi.Font = Enum.Font.GothamBold
+	closeLokasi.TextSize = 18
+	closeLokasi.BorderSizePixel = 0
+	
+	local closeCorner = Instance.new("UICorner", closeLokasi)
+	closeCorner.CornerRadius = UDim.new(0, 4)
+	
+	local scroll = Instance.new("ScrollingFrame", lokasiGui)
+	scroll.Size = UDim2.new(1, -10, 1, -45)
+	scroll.Position = UDim2.new(0, 5, 0, 40)
+	scroll.CanvasSize = UDim2.new(0, 0, 0, #teleports * 42)
+	scroll.ScrollBarThickness = 5
+	scroll.ScrollBarImageColor3 = Color3.fromRGB(0, 100, 200)
+	scroll.BackgroundTransparency = 1
+	
+	for i, loc in ipairs(teleports) do
+		local btn, btnFrame = createAestheticButton(scroll, loc.name, (i - 1) * 42, false)
+		btnFrame.Size = UDim2.new(1, -10, 0, 35)
+		btnFrame.Position = UDim2.new(0, 5, 0, (i - 1) * 42)
+		
+		btn.MouseButton1Click:Connect(function()
+			if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+				Player.Character.HumanoidRootPart.CFrame = CFrame.new(loc.pos)
+				-- Update freeze position jika sedang auto fishing
+				if running then
+					freezePos = Player.Character.HumanoidRootPart.CFrame
+				end
+			end
+		end)
+	end
+	
+	closeLokasi.MouseButton1Click:Connect(function()
+		lokasiGui:Destroy()
+	end)
+	
+	-- Hover effect untuk close button lokasi
+	closeLokasi.MouseEnter:Connect(function()
+		closeLokasi.BackgroundColor3 = Color3.fromRGB(170, 50, 50)
+	end)
+	closeLokasi.MouseLeave:Connect(function()
+		closeLokasi.BackgroundColor3 = Color3.fromRGB(120, 40, 40)
+	end)
+end)
+
+-- Handle character respawn
+Player.CharacterAdded:Connect(function(char)
+	task.wait(1) -- Tunggu character fully loaded
+	if running then
+		-- Jika auto fishing aktif, freeze character baru
+		task.wait(1)
+		freezeCharacter(true)
+	end
+end)

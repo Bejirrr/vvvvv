@@ -1,0 +1,89 @@
+--// Choose GUI - Black & Blue Theme (Executor Version)
+local LP = game:GetService("Players").LocalPlayer
+local PlayerGui = LP:FindFirstChildOfClass("PlayerGui")
+
+-- Hapus GUI lama jika ada
+if PlayerGui:FindFirstChild("ChooseGui") then
+	PlayerGui.ChooseGui:Destroy()
+end
+
+-- Buat ScreenGui
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "ChooseGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+-- Buat Frame utama
+local Frame = Instance.new("Frame")
+Frame.Size = UDim2.new(0, 220, 0, 150)
+Frame.Position = UDim2.new(0.5, -110, 0.5, -75)
+Frame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+Frame.BorderSizePixel = 2
+Frame.BorderColor3 = Color3.fromRGB(0, 170, 255)
+Frame.Parent = ScreenGui
+
+-- Rounded corner
+Instance.new("UICorner", Frame)
+
+-- Shadow (biru lembut)
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(0, 170, 255)
+UIStroke.Parent = Frame
+
+-- Judul
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 35)
+Title.BackgroundTransparency = 1
+Title.Text = "🎣 Choose Fish IT"
+Title.TextColor3 = Color3.fromRGB(0, 170, 255)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.Parent = Frame
+
+-- Tombol FISH IT V1
+local Button1 = Instance.new("TextButton")
+Button1.Size = UDim2.new(0.8, 0, 0, 35)
+Button1.Position = UDim2.new(0.1, 0, 0.45, 0)
+Button1.Text = "🐟 FISH IT V1"
+Button1.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+Button1.TextColor3 = Color3.new(1,1,1)
+Button1.Font = Enum.Font.GothamBold
+Button1.TextSize = 16
+Button1.Parent = Frame
+Instance.new("UICorner", Button1)
+
+-- Tombol FISH IT V2
+local Button2 = Instance.new("TextButton")
+Button2.Size = UDim2.new(0.8, 0, 0, 35)
+Button2.Position = UDim2.new(0.1, 0, 0.72, 0)
+Button2.Text = "🐠 FISH IT V2"
+Button2.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+Button2.TextColor3 = Color3.new(1,1,1)
+Button2.Font = Enum.Font.GothamBold
+Button2.TextSize = 16
+Button2.Parent = Frame
+Instance.new("UICorner", Button2)
+
+-- Efek Hover
+local function HoverEffect(btn)
+	btn.MouseEnter:Connect(function()
+		btn.BackgroundColor3 = Color3.fromRGB(0, 180, 255)
+	end)
+	btn.MouseLeave:Connect(function()
+		btn.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+	end)
+end
+HoverEffect(Button1)
+HoverEffect(Button2)
+
+-- Fungsi Klik
+Button1.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/Biontoken/Map-gunung/refs/heads/main/fishv1.txt"))()
+end)
+
+Button2.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
+	loadstring(game:HttpGet("https://raw.githubusercontent.com/Biontoken/Map-gunung/refs/heads/main/Fishv2.txt"))()
+end)
